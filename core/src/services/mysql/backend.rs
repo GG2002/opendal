@@ -21,6 +21,7 @@ use std::fmt::Debug;
 use mysql_async::prelude::*;
 use mysql_async::Opts;
 use mysql_async::Pool;
+use mysql_async::Row;
 use serde::Deserialize;
 
 use crate::raw::adapters::kv;
@@ -227,6 +228,8 @@ impl kv::Adapter for Adapter {
             Capability {
                 read: true,
                 write: true,
+                list: true,
+                list_with_recursive: true,
                 ..Default::default()
             },
         )
@@ -305,6 +308,44 @@ impl kv::Adapter for Adapter {
         .await
         .map_err(parse_mysql_error)?;
         Ok(())
+    }
+
+    async fn scan(&self, path: &str) -> Result<Vec<String>> {
+        let query = format!(
+            "SELECT `{}` FROM `{}` WHERE `{}` LIKE :path_prefix AND `{}` <> :path",
+            self.key_field, self.table, self.key_field, self.key_field
+        );
+        dbg!(path);
+
+        let mut conn = self
+            .connection_pool
+            .get_conn()
+            .await
+            .map_err(|err| parse_mysql_error(err))?;
+        dbg!(1111);
+        let statement = conn.prep(&query).await.map_err(parse_mysql_error)?;
+        dbg!(1111);
+
+        let params = params! {
+            "path_prefix" => format!("{}%", path),
+            "path" => path,
+        };
+
+        dbg!(&params);
+
+        let rows: Vec<Row> = conn
+            .exec(statement, params)
+            .await
+            .map_err(|err| parse_mysql_error(err))?;
+
+        let mut keys = Vec::new();
+        for row in rows {
+            let name: String = row.get(0).unwrap();
+            keys.push(name);
+        }
+        dbg!(&keys);
+
+        Ok(keys)
     }
 }
 
