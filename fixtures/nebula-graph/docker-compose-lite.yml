@@ -124,7 +124,7 @@ services:
     entrypoint: ""
     environment:
       ACTIVATOR_RETRY: ${ACTIVATOR_RETRY:-30}
-    command: 
+    command:
       - sh
       - -c
       - |
